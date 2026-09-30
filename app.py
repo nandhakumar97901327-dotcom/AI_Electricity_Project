@@ -1,16 +1,18 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import altair as alt
+import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 import datetime
 
-# Page Configuration
+# --- Page Configuration ---
 st.set_page_config(page_title="AI Electricity Forecasting", page_icon="⚡", layout="wide")
 
 st.title("⚡ AI Driven Electricity Consumption System")
 st.write("Machine Learning matrum Reverse Calculation moolama electricity usage-a predict panra system.")
 
-# 1. Generate Sample Historical Data
+# --- 1. Generate Sample Historical Data ---
 @st.cache_data
 def load_sample_data():
     dates = pd.date_range(start="2023-01-01", periods=365)
@@ -25,7 +27,7 @@ def load_sample_data():
 
 df = load_sample_data()
 
-# 2. Train the AI Model
+# --- 2. Train the AI Model ---
 X = df[['Temperature_C', 'Humidity_pct', 'DayOfWeek', 'Month']]
 y = df['Consumption_kWh']
 model = RandomForestRegressor(n_estimators=100, random_state=42)
@@ -51,15 +53,22 @@ with tab1:
                                   columns=['Temperature_C', 'Humidity_pct', 'DayOfWeek', 'Month'])
         prediction = model.predict(input_data)[0]
         
-        st.info(f"### 💡 Predicted Electricity Consumption: **{prediction:.2f} Units (kWh)**")
+        st.success(f"### 💡 Predicted Electricity Consumption: **{prediction:.2f} Units (kWh)**")
         
-        st.line_chart(df.set_index('Date')['Consumption_kWh'])
+        # --- UNMAIYANA HISTOGRAM DIAGRAM ---
+        st.write("---")
+        st.write("### 📊 Electricity Consumption Histogram Diagram")
+        fig, ax = plt.subplots()
+        ax.hist(df['Consumption_kWh'], bins=20, color='royalblue', edgecolor='black')
+        ax.set_title('Frequency Distribution of Electricity Consumption')
+        ax.set_xlabel('Consumption Units (kWh)')
+        ax.set_ylabel('Frequency (Days)')
+        st.pyplot(fig)
 
 with tab2:
     st.subheader("💡 Dynamic Sector & Accessories Breakdown")
-    st.write("Mudhalla neenga entha edathukku (Sector) bill calculate panna poreenga nu select pannunga. Apram antha edathula irukka Accessories-a select pannunga.")
+    st.write("Mudhalla neenga entha edathukku (Sector) bill calculate panna poreenga nu select pannunga.")
     
-    # 1. Sector Selection
     sector = st.selectbox(
         "🏢 Select Sector (Edam):",
         ["🏠 Home", "🏥 Hospital", "🏢 Company / IT Office", "🏫 College", "🏫 School", "🌐 Other"]
@@ -67,7 +76,6 @@ with tab2:
     
     bill_amount = st.number_input("Enter Electricity Bill Amount (₹) / Bill Thogai:", min_value=0, value=2000, step=100)
     
-    # 2. Accessories lists based on sector
     acc_dict = {
         "🏠 Home": ["💡 Light", "🌀 Fan", "⚙️ Motor", "💻 System", "🔌 Charger", "❄️ Fridge", "📺 TV", "🧊 AC", "👕 Washing Machine", "💦 Water Heater", "🔥 Iron Box"],
         "🏥 Hospital": ["💡 Light", "🌀 Fan", "⚙️ Motor", "💻 System", "🔌 Charger", "❄️ Fridge", "🧊 AC", "⚕️ ICU Ventilator", "☢️ X-Ray / Scanner", "🛗 Lift", "💦 Water Heater"],
@@ -83,7 +91,7 @@ with tab2:
         default_list = ["💡 Light", "🌀 Fan", "💻 System", "🔌 Charger"]
     else:
         current_list = acc_dict[sector]
-        default_list = current_list[:5] # Select first 5 by default
+        default_list = current_list[:5]
         
     st.write(f"#### ✅ Select Accessories for {sector}:")
     selected_accessories = st.multiselect("Accessories-a select pannunga:", options=current_list, default=default_list)
@@ -92,7 +100,6 @@ with tab2:
         if not selected_accessories:
             st.warning("⚠️ Ethaavathu oru accessory-a select pannunga!")
         else:
-            # Estimation Logic
             if bill_amount == 0:
                 estimated_units = 100 
             else:
@@ -100,9 +107,6 @@ with tab2:
                 
             st.success(f"### ⚡ Total Estimated Electricity Used: **~ {estimated_units:.0f} Units (kWh)**")
             
-            st.write(f"#### 📊 {sector} Accessories Breakdown:")
-            
-            # Master Weights for all accessories
             weights = {
                 "💡 Light": 1, "🌀 Fan": 1.5, "🔌 Charger": 0.2, "💻 System": 2, "❄️ Fridge": 5, "⚙️ Motor": 4, 
                 "📺 TV": 1.5, "🧊 AC": 10, "👕 Washing Machine": 3, "💦 Water Heater": 4, "🔥 Iron Box": 2,
@@ -110,16 +114,58 @@ with tab2:
                 "🖨️ Printer/Copier": 2, "📽️ Projector/Smart Board": 1, "🔬 Lab Equipment": 4, "🚰 Water Cooler": 2
             }
             
+            # Dynamic Weight Logic
+            if bill_amount > 5000:
+                for heavy in ["🧊 AC", "💦 Water Heater", "🛗 Lift", "⚕️ ICU Ventilator", "☢️ X-Ray / Scanner", "🖧 Server"]:
+                    if heavy in weights:
+                        weights[heavy] *= 2.5
+            elif bill_amount > 3000:
+                for heavy in ["🧊 AC", "💦 Water Heater", "🛗 Lift"]:
+                    if heavy in weights:
+                        weights[heavy] *= 1.5
+            
             total_weight = sum([weights.get(acc, 1) for acc in selected_accessories])
             
+            results = []
             for acc in selected_accessories:
                 acc_weight = weights.get(acc, 1)
                 acc_units = (acc_weight / total_weight) * estimated_units
-                acc_amount = (acc_weight / total_weight) * bill_amount  # Calculate Amount
-                percentage = int((acc_weight / total_weight) * 100)
+                acc_amount = (acc_weight / total_weight) * bill_amount
+                percentage = (acc_weight / total_weight) * 100
+                results.append({"Accessory": acc, "Units": round(acc_units), "Amount": acc_amount, "Percentage": percentage})
+            
+            # Sort highest amount first
+            results = sorted(results, key=lambda x: x['Amount'], reverse=True)
+            
+            # Exact Math Rounding
+            total_pct = sum([round(r['Percentage']) for r in results])
+            diff_pct = 100 - total_pct
+            if len(results) > 0:
+                results[0]['Percentage'] += diff_pct
                 
-                # Update text to show Units and Amount
-                st.write(f"- **{acc}:** ~{acc_units:.0f} Units | **₹ {acc_amount:.0f}** ({percentage}%)")
-                st.progress(percentage)
+            for r in results:
+                r['Percentage'] = round(r['Percentage'])
+                r['Amount'] = round(r['Amount'])
                 
-            st.info("💡 (Note: Ithu ovvoru accessory-oda general power usage-a vechu AI calculate panna model.)")
+            total_amt = sum([r['Amount'] for r in results])
+            diff_amt = bill_amount - total_amt
+            if len(results) > 0:
+                results[0]['Amount'] += diff_amt
+            
+            st.write(f"#### 📊 {sector} Accessories Breakdown:")
+            for r in results:
+                st.write(f"- **{r['Accessory']}:** ~{r['Units']} Units | **₹ {r['Amount']}** ({r['Percentage']}%)")
+            
+            # --- COLORFUL HISTOGRAM DIAGRAM ---
+            st.write("### 📈 Cost Breakdown Histogram Diagram")
+            chart_df = pd.DataFrame(results)
+            bars = alt.Chart(chart_df).mark_bar(cornerRadiusTopLeft=10, cornerRadiusTopRight=10).encode(
+                x=alt.X('Accessory:N', sort='-y', title='Accessories'),
+                y=alt.Y('Amount:Q', title='Amount (₹)'),
+                color=alt.Color('Accessory:N', legend=None),
+                tooltip=['Accessory', 'Units', 'Amount', 'Percentage']
+            ).interactive()
+            
+            st.altair_chart(bars, use_container_width=True)
+            
+            st.info("💡 (Note: Ithu AI moolama calculate panna approximate data.)")
