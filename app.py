@@ -35,11 +35,12 @@ model.fit(X, y)
 tab1, tab2 = st.tabs(["🔮 AI Prediction (Weather to Units)", "💰 Sector & Accessories Analyzer"])
 
 # =========================================================================
-# TAB 1: AI PREDICTION (SINGLE CLEAR 7-DAY FORECAST HISTOGRAM)
+# TAB 1: AI PREDICTION (ONE DAY WEATHER-BASED ELECTRICITY HISTOGRAM)
 # =========================================================================
 with tab1:
     st.subheader("Predict Future Consumption")
-    st.write("Nalaiku weather eppadi irukum nu input kudutha, evvalo current thevapdum nu AI sollum.")
+    st.write("Oru specific date matrum expected weather input kudutha, antha naalukana electricity consumption-a AI predict pannum.")
+    
     col1, col2 = st.columns(2)
     with col1:
         pred_date = st.date_input("Select Future Date", datetime.date.today())
@@ -55,38 +56,58 @@ with tab1:
         prediction = model.predict(input_data)[0]
         
         # Selected date formatted for display
-        date_str = pred_date.strftime("%d %B %Y")
-        st.success(f"### 💡 Predicted Electricity for **{date_str}**: **{prediction:.2f} Units (kWh)**")
+        date_str = pred_date.strftime("%d %B %Y (%A)")
         
-        # --- ONLY ONE CLEAR, INTUITIVE 7-DAY FORECAST HISTOGRAM ---
         st.write("---")
-        st.write(f"### 📊 7-Day Electricity Forecast Histogram (தேதி வாரியான மின்சார அளவு)")
-        st.caption(f"நீங்கள் தேர்வு செய்த தேதி ({date_str}) மற்றும் அதனைச் சுற்றியுள்ள 7 நாட்களின் கணிப்பு:")
+        # Clean metric summary for the selected ONE date
+        st.write(f"### 📅 Weather & Prediction Summary for {date_str}")
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("Selected Date", pred_date.strftime("%d %b %Y"))
+        col_m2.metric("Expected Weather", f"{pred_temp:.1f} °C (Humidity: {pred_humidity:.0f}%)")
+        col_m3.metric("Total Predicted Units", f"{prediction:.1f} Units (kWh)")
         
-        forecast_days = []
-        for i in range(-2, 5):
-            d = pred_date + datetime.timedelta(days=i)
-            d_dow = d.weekday()
-            d_month = d.month
-            
-            # Weather variation reflecting the trend
-            t_var = pred_temp + (np.sin(i) * 1.5 if i != 0 else 0)
-            h_var = pred_humidity + (np.cos(i) * 2.0 if i != 0 else 0)
-            
-            row = pd.DataFrame([[t_var, h_var, d_dow, d_month]],
-                               columns=['Temperature_C', 'Humidity_pct', 'DayOfWeek', 'Month'])
-            val = model.predict(row)[0]
-            
-            # Label highlighting the selected date clearly
-            tag = " 👈 Selected" if i == 0 else ""
-            label = d.strftime("%d %b (%a)") + tag
-            forecast_days.append({
-                "Date": label,
-                "Units (kWh)": round(val, 1)
-            })
-            
-        df_chart = pd.DataFrame(forecast_days).set_index("Date")
-        st.bar_chart(df_chart["Units (kWh)"])
+        # --- ONLY ONE CLEAN WEATHER-BASED HISTOGRAM FOR THE ONE SELECTED DATE ---
+        st.write("---")
+        st.write(f"### 📊 Weather & Electricity Consumption Breakdown ({pred_date.strftime('%d %b %Y')})")
+        st.caption(f"நீங்கள் தேர்வு செய்த அந்த ஒரு நாளின் ({pred_date.strftime('%d %b %Y')}) வானிலை மாற்றங்களுக்கு ஏற்ப மின்சார பயன்பாடு:")
+        
+        # 4 Weather & Time periods for that ONE selected date
+        # Dynamic weather variation throughout the selected day
+        morning_temp = round(pred_temp - 5.0, 1)
+        afternoon_temp = round(pred_temp + 5.0, 1)
+        evening_temp = round(pred_temp - 2.0, 1)
+        night_temp = round(pred_temp - 4.0, 1)
+        
+        # Weight calculations based on temperature impact
+        heat_factor = max(0.0, (pred_temp - 25.0) * 0.008)
+        w_morning = max(0.12, 0.20 - heat_factor * 0.3)
+        w_afternoon = min(0.55, 0.38 + heat_factor)
+        w_evening = 0.27
+        w_night = max(0.10, 0.15 - heat_factor * 0.5)
+        
+        total_w = w_morning + w_afternoon + w_evening + w_night
+        
+        day_weather_breakdown = [
+            {
+                "Weather Condition": f"🌅 Morning ({morning_temp}°C Cool)",
+                "Electricity Units (kWh)": round((w_morning / total_w) * prediction, 1)
+            },
+            {
+                "Weather Condition": f"☀️ Afternoon ({afternoon_temp}°C Peak Sun)",
+                "Electricity Units (kWh)": round((w_afternoon / total_w) * prediction, 1)
+            },
+            {
+                "Weather Condition": f"🌆 Evening ({evening_temp}°C Sunset)",
+                "Electricity Units (kWh)": round((w_evening / total_w) * prediction, 1)
+            },
+            {
+                "Weather Condition": f"🌙 Night ({night_temp}°C Cool)",
+                "Electricity Units (kWh)": round((w_night / total_w) * prediction, 1)
+            }
+        ]
+        
+        chart_df = pd.DataFrame(day_weather_breakdown).set_index("Weather Condition")
+        st.bar_chart(chart_df["Electricity Units (kWh)"])
 
 # =========================================================================
 # TAB 2: SECTOR & ACCESSORIES (SINGLE CLEAN HISTOGRAM)
