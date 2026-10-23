@@ -5,6 +5,7 @@ import altair as alt
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 import datetime
+import re
 
 # --- Page Configuration ---
 st.set_page_config(page_title="AI Electricity Forecasting", page_icon="⚡", layout="wide")
@@ -64,20 +65,9 @@ with tab1:
             "Time Period": ["Morning (6 AM)", "Afternoon (12 PM)", "Evening Peak (6 PM)", "Night (10 PM)", "Selected Forecast"],
             "Past Normal (kWh)": [round(prediction * 0.70, 1), round(prediction * 0.85, 1), round(prediction * 1.15, 1), round(prediction * 0.60, 1), round(prediction * 0.90, 1)],
             "AI Predicted Load (kWh)": [round(prediction * 0.75, 1), round(prediction * 0.95, 1), round(prediction * 1.25, 1), round(prediction * 0.65, 1), round(prediction, 1)]
-        })
+        }, index=["Morning (6 AM)", "Afternoon (12 PM)", "Evening Peak (6 PM)", "Night (10 PM)", "Selected Forecast"])
         
-        # Melt dataframe for side-by-side grouped histogram bars
-        melted_hist = hist_df.melt(id_vars=["Time Period"], var_name="Type", value_name="Units (kWh)")
-        
-        hist_chart = alt.Chart(melted_hist).mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5).encode(
-            x=alt.X('Time Period:N', sort=None, title='Time of Day'),
-            y=alt.Y('Units (kWh):Q', title='Consumption (kWh)'),
-            color=alt.Color('Type:N', scale=alt.Scale(domain=['Past Normal (kWh)', 'AI Predicted Load (kWh)'], range=['#9ca3af', '#2563eb'])),
-            xOffset='Type:N',
-            tooltip=['Time Period', 'Type', 'Units (kWh)']
-        ).properties(height=350).interactive()
-        
-        st.altair_chart(hist_chart, use_container_width=True)
+        st.bar_chart(hist_df[["Past Normal (kWh)", "AI Predicted Load (kWh)"]])
         
         # --- 2. HISTORICAL FREQUENCY DISTRIBUTION HISTOGRAM ---
         st.write("### 📈 Historical Frequency Distribution Histogram")
@@ -184,16 +174,31 @@ with tab2:
             for r in results:
                 st.write(f"- **{r['Accessory']}:** ~{r['Units']} Units | **₹ {r['Amount']}** ({r['Percentage']}%)")
             
-            # --- COLORFUL HISTOGRAM / BAR CHART ---
-            st.write("### 📈 Cost Breakdown Histogram Diagram")
-            chart_df = pd.DataFrame(results)
-            bars = alt.Chart(chart_df).mark_bar(cornerRadiusTopLeft=10, cornerRadiusTopRight=10).encode(
-                x=alt.X('Accessory:N', sort='-y', title='Accessories'),
-                y=alt.Y('Amount:Q', title='Amount (₹)'),
-                color=alt.Color('Accessory:N', legend=None),
-                tooltip=['Accessory', 'Units', 'Amount', 'Percentage']
-            ).interactive()
+            # --- REAL VISIBLE HISTOGRAM DIAGRAM (FIXED & GUARANTEED TO SHOW BARS) ---
+            st.write("---")
+            st.write("### 📊 Cost Breakdown Histogram Diagram")
             
-            st.altair_chart(bars, use_container_width=True)
+            # 1. Native Streamlit Interactive Bar Histogram
+            chart_df = pd.DataFrame(results).set_index("Accessory")
+            st.bar_chart(chart_df["Amount"])
+            
+            # 2. Rich Colorful Matplotlib Histogram with Values on Top of Bars
+            clean_names = [re.sub(r'[^\w\s]', '', r['Accessory']).strip() for r in results]
+            amounts_list = [r['Amount'] for r in results]
+            palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1']
+            
+            fig2, ax2 = plt.subplots(figsize=(10, 4.5))
+            bar_plot = ax2.bar(clean_names, amounts_list, color=palette[:len(clean_names)], edgecolor='black', linewidth=1.2, width=0.55)
+            ax2.set_title("Appliance Cost Breakdown (₹)", fontsize=13, fontweight='bold', pad=10)
+            ax2.set_ylabel("Amount (₹)", fontsize=10)
+            ax2.grid(axis='y', linestyle='--', alpha=0.35)
+            ax2.tick_params(axis='x', rotation=15)
+            
+            for b in bar_plot:
+                h = b.get_height()
+                ax2.text(b.get_x() + b.get_width()/2.0, h + max(amounts_list)*0.02, f"₹{int(h)}", ha='center', va='bottom', fontweight='bold', fontsize=9)
+            
+            plt.tight_layout()
+            st.pyplot(fig2)
             
             st.info("💡 (Note: Ithu AI moolama calculate panna approximate data.)")
