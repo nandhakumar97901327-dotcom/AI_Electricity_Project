@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 import datetime
 
@@ -35,6 +34,9 @@ model.fit(X, y)
 # ----------------- TABS CREATION -----------------
 tab1, tab2 = st.tabs(["🔮 AI Prediction (Weather to Units)", "💰 Sector & Accessories Analyzer"])
 
+# =========================================================================
+# TAB 1: AI PREDICTION (SINGLE CLEAR 7-DAY FORECAST HISTOGRAM)
+# =========================================================================
 with tab1:
     st.subheader("Predict Future Consumption")
     st.write("Nalaiku weather eppadi irukum nu input kudutha, evvalo current thevapdum nu AI sollum.")
@@ -52,35 +54,43 @@ with tab1:
                                   columns=['Temperature_C', 'Humidity_pct', 'DayOfWeek', 'Month'])
         prediction = model.predict(input_data)[0]
         
-        st.success(f"### 💡 Predicted Electricity Consumption: **{prediction:.2f} Units (kWh)**")
+        # Selected date formatted for display
+        date_str = pred_date.strftime("%d %B %Y")
+        st.success(f"### 💡 Predicted Electricity for **{date_str}**: **{prediction:.2f} Units (kWh)**")
         
-        # --- 1. DYNAMIC TIME-OF-DAY HISTOGRAM (BAR CHART) ---
+        # --- ONLY ONE CLEAR, INTUITIVE 7-DAY FORECAST HISTOGRAM ---
         st.write("---")
-        st.write("### 📊 Live Electricity Consumption Histogram (Time of Day)")
-        st.caption("AI கணித்த மின்சார பயன்பாடும், இயல்பான சராசரியும் (Histogram View):")
+        st.write(f"### 📊 7-Day Electricity Forecast Histogram (தேதி வாரியான மின்சார அளவு)")
+        st.caption(f"நீங்கள் தேர்வு செய்த தேதி ({date_str}) மற்றும் அதனைச் சுற்றியுள்ள 7 நாட்களின் கணிப்பு:")
         
-        hist_df = pd.DataFrame({
-            "Time Period": ["Morning (6 AM)", "Afternoon (12 PM)", "Evening Peak (6 PM)", "Night (10 PM)", "Selected Forecast"],
-            "Past Normal (kWh)": [round(prediction * 0.70, 1), round(prediction * 0.85, 1), round(prediction * 1.15, 1), round(prediction * 0.60, 1), round(prediction * 0.90, 1)],
-            "AI Predicted Load (kWh)": [round(prediction * 0.75, 1), round(prediction * 0.95, 1), round(prediction * 1.25, 1), round(prediction * 0.65, 1), round(prediction, 1)]
-        }, index=["Morning (6 AM)", "Afternoon (12 PM)", "Evening Peak (6 PM)", "Night (10 PM)", "Selected Forecast"])
-        
-        st.bar_chart(hist_df[["Past Normal (kWh)", "AI Predicted Load (kWh)"]])
-        
-        # --- 2. HISTORICAL FREQUENCY DISTRIBUTION HISTOGRAM ---
-        st.write("### 📈 Historical Frequency Distribution Histogram")
-        st.caption("முந்தைய 365 நாட்களின் பயன்பாட்டில் உங்கள் கணிப்பு எங்கே அமைகிறது (சிவப்பு கோடு):")
-        
-        fig, ax = plt.subplots(figsize=(10, 4))
-        n, bins, patches = ax.hist(df['Consumption_kWh'], bins=25, color='#3b82f6', edgecolor='black', alpha=0.7, label='Historical Days Distribution')
-        ax.axvline(prediction, color='red', linestyle='dashed', linewidth=2.5, label=f'Your Prediction ({prediction:.1f} kWh)')
-        ax.set_title('Frequency Distribution of Electricity Consumption')
-        ax.set_xlabel('Consumption Units (kWh)')
-        ax.set_ylabel('Number of Days (Frequency)')
-        ax.legend()
-        ax.grid(axis='y', alpha=0.3)
-        st.pyplot(fig)
+        forecast_days = []
+        for i in range(-2, 5):
+            d = pred_date + datetime.timedelta(days=i)
+            d_dow = d.weekday()
+            d_month = d.month
+            
+            # Weather variation reflecting the trend
+            t_var = pred_temp + (np.sin(i) * 1.5 if i != 0 else 0)
+            h_var = pred_humidity + (np.cos(i) * 2.0 if i != 0 else 0)
+            
+            row = pd.DataFrame([[t_var, h_var, d_dow, d_month]],
+                               columns=['Temperature_C', 'Humidity_pct', 'DayOfWeek', 'Month'])
+            val = model.predict(row)[0]
+            
+            # Label highlighting the selected date clearly
+            tag = " 👈 Selected" if i == 0 else ""
+            label = d.strftime("%d %b (%a)") + tag
+            forecast_days.append({
+                "Date": label,
+                "Units (kWh)": round(val, 1)
+            })
+            
+        df_chart = pd.DataFrame(forecast_days).set_index("Date")
+        st.bar_chart(df_chart["Units (kWh)"])
 
+# =========================================================================
+# TAB 2: SECTOR & ACCESSORIES (SINGLE CLEAN HISTOGRAM)
+# =========================================================================
 with tab2:
     st.subheader("💡 Dynamic Sector & Accessories Breakdown")
     st.write("Mudhalla neenga entha edathukku (Sector) bill calculate panna poreenga nu select pannunga.")
@@ -179,4 +189,3 @@ with tab2:
             # Single, unified, interactive Streamlit bar histogram
             chart_df = pd.DataFrame(results).set_index("Accessory")
             st.bar_chart(chart_df["Amount"])
-            
