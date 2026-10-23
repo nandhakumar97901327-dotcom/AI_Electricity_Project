@@ -1,11 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import altair as alt
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 import datetime
-import re
 
 # --- Page Configuration ---
 st.set_page_config(page_title="AI Electricity Forecasting", page_icon="⚡", layout="wide")
@@ -174,31 +172,12 @@ with tab2:
             for r in results:
                 st.write(f"- **{r['Accessory']}:** ~{r['Units']} Units | **₹ {r['Amount']}** ({r['Percentage']}%)")
             
-            # --- REAL VISIBLE HISTOGRAM DIAGRAM (FIXED & GUARANTEED TO SHOW BARS) ---
+            # --- ONLY ONE CLEAN, NATIVE HISTOGRAM (NO DUPLICATES) ---
             st.write("---")
-            st.write("### 📊 Cost Breakdown Histogram Diagram")
+            st.write("### 📊 Cost Breakdown Histogram (₹)")
             
-            # 1. Native Streamlit Interactive Bar Histogram
+            # Single, unified, interactive Streamlit bar histogram
             chart_df = pd.DataFrame(results).set_index("Accessory")
             st.bar_chart(chart_df["Amount"])
-            
-            # 2. Rich Colorful Matplotlib Histogram with Values on Top of Bars
-            clean_names = [re.sub(r'[^\w\s]', '', r['Accessory']).strip() for r in results]
-            amounts_list = [r['Amount'] for r in results]
-            palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1']
-            
-            fig2, ax2 = plt.subplots(figsize=(10, 4.5))
-            bar_plot = ax2.bar(clean_names, amounts_list, color=palette[:len(clean_names)], edgecolor='black', linewidth=1.2, width=0.55)
-            ax2.set_title("Appliance Cost Breakdown (₹)", fontsize=13, fontweight='bold', pad=10)
-            ax2.set_ylabel("Amount (₹)", fontsize=10)
-            ax2.grid(axis='y', linestyle='--', alpha=0.35)
-            ax2.tick_params(axis='x', rotation=15)
-            
-            for b in bar_plot:
-                h = b.get_height()
-                ax2.text(b.get_x() + b.get_width()/2.0, h + max(amounts_list)*0.02, f"₹{int(h)}", ha='center', va='bottom', fontweight='bold', fontsize=9)
-            
-            plt.tight_layout()
-            st.pyplot(fig2)
             
             st.info("💡 (Note: Ithu AI moolama calculate panna approximate data.)")
