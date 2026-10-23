@@ -180,4 +180,3 @@ with tab2:
             chart_df = pd.DataFrame(results).set_index("Accessory")
             st.bar_chart(chart_df["Amount"])
             
-            st.info("💡 (Note: Ithu AI moolama calculate panna approximate data.)")
